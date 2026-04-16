@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Any, AsyncGenerator
 from openai import APIConnectionError, APIError, AsyncOpenAI, RateLimitError
 
@@ -11,7 +12,7 @@ from client.response import (
     ToolCallDelta,
     parse_tool_call_arguments,
 )
-from config.config import Config
+from config.config import Config, Provider
 
 
 class LLMClient:
@@ -19,13 +20,14 @@ class LLMClient:
         self._client: AsyncOpenAI | None = None
         self._max_retries: int = 3
         self.config = config
-        self.tools_supported: bool = True
+        # Ollama models do not support tool calling - disable it upfront
+        self.tools_supported: bool = (config.provider != Provider.OLLAMA)
 
     def get_client(self) -> AsyncOpenAI:
         if self._client is None:
             self._client = AsyncOpenAI(
-                api_key=self.config.api_key,  
-                base_url=self.config.base_url,
+                api_key=self.config.api_key,  # "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"
+                base_url=self.config.base_url,  # "https://openrouter.ai/api/v1"
             )
         return self._client
 
@@ -200,12 +202,16 @@ class LLMClient:
                             )
 
         for idx, tc in tool_calls.items():
+            # Convert arguments dict to JSON string for consistency
+            args_dict = parse_tool_call_arguments(tc["arguments"])
+            args_json = json.dumps(args_dict) if isinstance(args_dict, dict) else str(args_dict)
+            
             yield StreamEvent(
                 type=StreamEventType.TOOL_CALL_COMPLETE,
                 tool_call=ToolCall(
                     call_id=tc["id"],
                     name=tc["name"],
-                    arguments=parse_tool_call_arguments(tc["arguments"]),
+                    arguments=args_json,
                 ),
             )
 
@@ -231,11 +237,13 @@ class LLMClient:
         tool_calls: list[ToolCall] = []
         if message.tool_calls:
             for tc in message.tool_calls:
+                args_dict = parse_tool_call_arguments(tc.function.arguments)
+                args_json = json.dumps(args_dict) if isinstance(args_dict, dict) else str(args_dict)
                 tool_calls.append(
                     ToolCall(
                         call_id=tc.id,
                         name=tc.function.name,
-                        arguments=parse_tool_call_arguments(tc.function.arguments),
+                        arguments=args_json,
                     )
                 )
 

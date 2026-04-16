@@ -10,7 +10,6 @@ async def list_ollama_models(base_url: str = "http://localhost:11434") -> list[s
             data = resp.json()
             models = data.get("models", [])
             return [m["name"] for m in models]
-            
     except Exception:
         return []
 

@@ -215,4 +215,3 @@ I'll continue with the REMAINING tasks only, starting from where we left off."""
 
     def clear(self) -> None:
         self._messages = []
-

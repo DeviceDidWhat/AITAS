@@ -90,4 +90,3 @@ class ChatCompactor:
             return summary, usage
         except Exception:
             return None, None
-
